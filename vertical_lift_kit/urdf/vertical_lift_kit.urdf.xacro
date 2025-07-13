@@ -1,0 +1,225 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="vertical_lift_kit">
+
+  <!-- Xacro Properties -->
+  <xacro:property name="PI" value="3.14159"/>
+  
+  <!-- Base dimensions -->
+  <xacro:property name="base_width" value="0.3"/>
+  <xacro:property name="base_length" value="0.3"/>
+  <xacro:property name="base_height" value="0.1"/>
+  <xacro:property name="base_mass" value="5.0"/>
+  
+  <!-- Rail dimensions -->
+  <xacro:property name="rail_width" value="0.05"/>
+  <xacro:property name="rail_length" value="0.05"/>
+  <xacro:property name="rail_height" value="1.2"/>
+  <xacro:property name="rail_mass" value="2.0"/>
+  
+  <!-- Platform dimensions -->
+  <xacro:property name="platform_width" value="0.25"/>
+  <xacro:property name="platform_length" value="0.25"/>
+  <xacro:property name="platform_height" value="0.05"/>
+  <xacro:property name="platform_mass" value="1.0"/>
+  
+  <!-- Lift joint properties -->
+  <xacro:property name="lift_min" value="0.0"/>
+  <xacro:property name="lift_max" value="1.0"/>
+  <xacro:property name="lift_effort" value="1000.0"/>
+  <xacro:property name="lift_velocity" value="0.5"/>
+  <xacro:property name="lift_damping" value="0.1"/>
+  <xacro:property name="lift_friction" value="0.1"/>
+
+  <!-- Material definitions -->
+  <material name="gray">
+    <color rgba="0.5 0.5 0.5 1"/>
+  </material>
+  
+  <material name="steel">
+    <color rgba="0.7 0.7 0.7 1"/>
+  </material>
+  
+  <material name="blue">
+    <color rgba="0.2 0.2 0.8 1"/>
+  </material>
+
+  <!-- Macro for calculating box inertia -->
+  <xacro:macro name="box_inertia" params="mass x y z">
+    <inertial>
+      <mass value="${mass}"/>
+      <inertia ixx="${mass * (y*y + z*z) / 12.0}" ixy="0.0" ixz="0.0"
+               iyy="${mass * (x*x + z*z) / 12.0}" iyz="0.0"
+               izz="${mass * (x*x + y*y) / 12.0}"/>
+    </inertial>
+  </xacro:macro>
+
+  <!-- Macro for creating a box link -->
+  <xacro:macro name="box_link" params="name mass x y z origin_x origin_y origin_z origin_r origin_p origin_yaw material_name">
+    <link name="${name}">
+      <visual>
+        <origin xyz="${origin_x} ${origin_y} ${origin_z}" rpy="${origin_r} ${origin_p} ${origin_yaw}"/>
+        <geometry>
+          <box size="${x} ${y} ${z}"/>
+        </geometry>
+        <material name="${material_name}"/>
+      </visual>
+      <collision>
+        <origin xyz="${origin_x} ${origin_y} ${origin_z}" rpy="${origin_r} ${origin_p} ${origin_yaw}"/>
+        <geometry>
+          <box size="${x} ${y} ${z}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <origin xyz="${origin_x} ${origin_y} ${origin_z}" rpy="${origin_r} ${origin_p} ${origin_yaw}"/>
+        <mass value="${mass}"/>
+        <inertia ixx="${mass * (y*y + z*z) / 12.0}" ixy="0.0" ixz="0.0"
+                 iyy="${mass * (x*x + z*z) / 12.0}" iyz="0.0"
+                 izz="${mass * (x*x + y*y) / 12.0}"/>
+      </inertial>
+    </link>
+  </xacro:macro>
+
+  <!-- Base Link -->
+  <xacro:box_link name="base_link" 
+                  mass="${base_mass}" 
+                  x="${base_width}" y="${base_length}" z="${base_height}"
+                  origin_x="0" origin_y="0" origin_z="${base_height/2}"
+                  origin_r="0" origin_p="0" origin_yaw="0"
+                  material_name="gray"/>
+
+  <!-- Lift Rail Link -->
+  <xacro:box_link name="lift_rail" 
+                  mass="${rail_mass}" 
+                  x="${rail_width}" y="${rail_length}" z="${rail_height}"
+                  origin_x="0" origin_y="0" origin_z="${rail_height/2}"
+                  origin_r="0" origin_p="0" origin_yaw="0"
+                  material_name="steel"/>
+
+  <!-- Lift Platform Link - L-shaped -->
+  <link name="lift_platform">
+    <!-- Horizontal part of L -->
+    <visual>
+      <origin xyz="0 0 ${platform_height/2}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${platform_width} ${platform_length} ${platform_height}"/>
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 ${platform_height/2}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${platform_width} ${platform_length} ${platform_height}"/>
+      </geometry>
+    </collision>
+    
+    <!-- Vertical part of L -->
+    <visual>
+      <origin xyz="${platform_width/2 - platform_height/2} 0 ${platform_height/2 + platform_length/2}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${platform_height} ${platform_width} ${platform_length}"/>
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <origin xyz="${platform_width/2 - platform_height/2} 0 ${platform_height/2 + platform_length/2}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${platform_height} ${platform_width} ${platform_length}"/>
+      </geometry>
+    </collision>
+    
+    <!-- Combined inertial properties for L-shaped platform -->
+    <inertial>
+      <origin xyz="${(platform_width/2 - platform_height/2) * platform_height / (2 * platform_height)} 0 ${(platform_height/2 + (platform_height/2 + platform_length/2)) / 2}" rpy="0 0 0"/>
+      <mass value="${platform_mass}"/>
+      <!-- Approximate inertia for L-shaped body -->
+      <inertia ixx="${platform_mass * (platform_width*platform_width + platform_length*platform_length) / 12.0}" 
+               ixy="0.0" ixz="0.0"
+               iyy="${platform_mass * (platform_width*platform_width + platform_length*platform_length) / 12.0}" 
+               iyz="0.0"
+               izz="${platform_mass * (platform_width*platform_width + platform_length*platform_length) / 12.0}"/>
+    </inertial>
+  </link>
+
+  <!-- Base to Rail Joint (Fixed) -->
+  <joint name="base_to_rail" type="fixed">
+    <parent link="base_link"/>
+    <child link="lift_rail"/>
+    <origin xyz="0 0 ${base_height}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Lift Joint (Prismatic) -->
+  <joint name="lift_joint" type="prismatic">
+    <parent link="lift_rail"/>
+    <child link="lift_platform"/>
+    <origin xyz="0 0 ${lift_min}" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="${lift_min}" upper="${lift_max}" effort="${lift_effort}" velocity="${lift_velocity}"/>
+    <dynamics damping="${lift_damping}" friction="${lift_friction}"/>
+  </joint>
+
+  <!-- Gazebo ros2_control plugin for Ignition Gazebo 6 -->
+  <gazebo>
+    <plugin filename="ign_ros2_control-system" name="ign_ros2_control::IgnitionROS2ControlPlugin">
+      <parameters>$(find vertical_lift_kit)/config/controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+  <!-- Xacro argument for hardware type -->
+  <xacro:arg name="use_mock_hardware" default="false"/>
+  <xacro:property name="use_mock_hardware" value="$(arg use_mock_hardware)"/>
+
+  <!-- ros2_control -->
+  <ros2_control name="vertical_lift_kit_control" type="system">
+    <hardware>
+      <xacro:if value="${use_mock_hardware}">
+        <plugin>mock_components/GenericSystem</plugin>
+        <param name="mock_sensor_commands">false</param>
+        <param name="state_following_offset">0.0</param>
+      </xacro:if>
+      <xacro:unless value="${use_mock_hardware}">
+        <plugin>ign_ros2_control/IgnitionSystem</plugin>
+      </xacro:unless>
+    </hardware>
+    
+    <joint name="lift_joint">
+      <command_interface name="position">
+        <param name="min">${lift_min}</param>
+        <param name="max">${lift_max}</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <!-- Gazebo Materials for gz-sim -->
+  <gazebo reference="base_link">
+    <visual>
+      <material>
+        <ambient>0.5 0.5 0.5 1</ambient>
+        <diffuse>0.5 0.5 0.5 1</diffuse>
+        <specular>0.1 0.1 0.1 1</specular>
+      </material>
+    </visual>
+  </gazebo>
+  
+  <gazebo reference="lift_rail">
+    <visual>
+      <material>
+        <ambient>0.7 0.7 0.7 1</ambient>
+        <diffuse>0.7 0.7 0.7 1</diffuse>
+        <specular>0.3 0.3 0.3 1</specular>
+      </material>
+    </visual>
+  </gazebo>
+  
+  <gazebo reference="lift_platform">
+    <visual>
+      <material>
+        <ambient>0.2 0.2 0.8 1</ambient>
+        <diffuse>0.2 0.2 0.8 1</diffuse>
+        <specular>0.1 0.1 0.3 1</specular>
+      </material>
+    </visual>
+  </gazebo>
+
+</robot>
